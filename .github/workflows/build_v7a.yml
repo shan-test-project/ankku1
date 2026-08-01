@@ -1,0 +1,96 @@
+name: Build Anikku armeabi-v7a APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag name'
+        required: false
+        default: 'v7a-latest'
+
+jobs:
+  build:
+    name: Build armeabi-v7a APK (R8 + debug-signed)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v3
+
+      - name: Write debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null
+
+      - name: Build preview APK (armeabi-v7a, R8 enabled, R8 report)
+        env:
+          CI: true
+        run: |
+          ./gradlew assemblePreview \
+            -Pandroid.enableR8.fullMode=false \
+            -Pandroid.testCoverageEnabled=false \
+            --no-daemon \
+            -x lint \
+            -x test \
+            --stacktrace \
+            -Pandroid.injected.signing.store.file="$HOME/.android/debug.keystore" \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android
+
+      - name: Find APK
+        id: find_apk
+        run: |
+          APK=$(find . -path "*/preview/*armeabi-v7a*.apk" -o -path "*/preview/*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            APK=$(find . -name "*.apk" | head -1)
+          fi
+          echo "apk_path=$APK" >> $GITHUB_OUTPUT
+          echo "Found APK: $APK"
+          ls -lh "$APK" || true
+
+      - name: Generate R8 mapping report
+        run: |
+          find . -name "mapping.txt" -path "*/preview/*" 2>/dev/null | head -5 || echo "mapping.txt not found"
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.tag_name || 'v7a-latest' }}
+          release_name: Ankku1 – ${{ github.event.inputs.tag_name || 'v7a-latest' }} (armeabi-v7a debug-signed)
+          draft: false
+          prerelease: true
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.find_apk.outputs.apk_path }}
+          asset_name: Ankku1-armeabi-v7a-${{ github.event.inputs.tag_name || 'v7a-latest' }}.apk
+          asset_content_type: application/vnd.android.package-archive

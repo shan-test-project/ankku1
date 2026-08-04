@@ -22,8 +22,15 @@ import uy.kohesive.injekt.api.get
 
 /**
  * Fires the actual system notification once an alarm scheduled by [ScheduleNotifications]
- * reaches its trigger time. Styled to match the app's own notification look (accent color,
- * app icon, cover art as the large icon) rather than a bare system default notification.
+ * reaches its trigger time.
+ *
+ * Notification style (matches the target design):
+ *  - Collapsed: app icon (small), cover art thumbnail on the right (large icon),
+ *               bold title, "Episode N just aired" text.
+ *  - Expanded:  BigPictureStyle — cover art fills the image area; the large icon is
+ *               hidden so the picture gets full width (bigLargeIcon(null)).
+ *  - Action:    "Open" button that launches the anime detail screen.
+ *  - Fallback:  BigTextStyle when no cover is available.
  */
 class ScheduleAlarmReceiver : BroadcastReceiver() {
 
@@ -95,12 +102,34 @@ class ScheduleAlarmReceiver : BroadcastReceiver() {
                 setSmallIcon(R.drawable.ic_komikku)
                 setContentTitle(title)
                 setContentText(contentText)
-                setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
-                coverBitmap?.let { setLargeIcon(it) }
                 setPriority(NotificationCompat.PRIORITY_HIGH)
                 setCategory(NotificationCompat.CATEGORY_REMINDER)
                 setAutoCancel(true)
                 setContentIntent(pendingContentIntent)
+                setOnlyAlertOnce(true)
+
+                if (coverBitmap != null) {
+                    // Collapsed view: cover art as the right-hand thumbnail.
+                    setLargeIcon(coverBitmap)
+                    // Expanded view: BigPictureStyle fills the notification with the cover.
+                    // bigLargeIcon(null) hides the thumbnail in expanded mode so the picture
+                    // gets the full width — exactly matching the target design.
+                    setStyle(
+                        NotificationCompat.BigPictureStyle()
+                            .bigPicture(coverBitmap)
+                            .bigLargeIcon(null as Bitmap?)
+                            .setSummaryText(contentText),
+                    )
+                } else {
+                    setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
+                }
+
+                // "Open" action button — tapping it launches the same anime detail screen.
+                addAction(
+                    R.drawable.ic_baseline_open_in_new_24,
+                    "Open",
+                    pendingContentIntent,
+                )
             }
         }
     }

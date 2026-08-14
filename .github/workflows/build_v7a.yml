@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag name1'
+        description: 'Release tag name'
         required: false
-        default: 'v7a-latest1'
+        default: 'v7a-latest'
+        type: string
 
 permissions:
   contents: write
@@ -14,26 +15,32 @@ permissions:
 jobs:
   build:
     name: Build armeabi-v7a APK (R8 + debug-signed)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.2.2
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@ed408507eac070d70c94bbf7c4f6c8f2f8b7c7a # v4.4.0
 
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v3
+        uses: gradle/actions/wrapper-validation@v2
+
+      - name: Run Spotless
+        run: ./gradlew spotlessApply --no-daemon
 
       - name: Write debug keystore
         run: |
           mkdir -p "$HOME/.android"
+          rm -f "$HOME/.android/debug.keystore"
           keytool -genkeypair \
             -keystore "$HOME/.android/debug.keystore" \
             -storepass android \
@@ -42,16 +49,23 @@ jobs:
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -noprompt
 
-      - name: Build preview APK (armeabi-v7a, R8, debug-signed)
+      - name: Build preview APK (armeabi-v7a, full-mode R8, debug-signed)
         env:
           CI: true
         run: |
           ./gradlew assemblePreview \
-            -Pandroid.enableR8.fullMode=false \
+            -Pandroid.enableR8.fullMode=true \
             -Pandroid.testCoverageEnabled=false \
+            -Pinclude-telemetry \
+            -Penable-updater \
+            -Pinclude-dependency-info \
+            -PenableComposeCompilerMetrics=true \
+            -PenableComposeCompilerReports=true \
             --no-daemon \
+            --stacktrace \
             -x lint \
             -x test \
             -Pandroid.injected.signing.store.file="$HOME/.android/debug.keystore" \
@@ -59,38 +73,75 @@ jobs:
             -Pandroid.injected.signing.key.alias=androiddebugkey \
             -Pandroid.injected.signing.key.password=android
 
-      - name: Find and rename APK
+      - name: Find and rename armeabi-v7a APK
         id: apk
         run: |
-          APK=$(find . -name "*.apk" -path "*/preview/*" | grep -i "armeabi-v7a\|preview" | head -1)
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk -type f -name '*.apk' -print | grep -Ei 'armeabi-v7a|armeabi_v7a' | head -1 || true)"
           if [ -z "$APK" ]; then
-            APK=$(find . -name "*.apk" | head -1)
+            echo 'No armeabi-v7a APK was produced. Available APKs:'
+            find app/build/outputs/apk -type f -name '*.apk' -print || true
+            exit 1
           fi
-          TAG="${{ github.event.inputs.tag_name }}"
-          DEST="Ankku1-armeabi-v7a-${TAG}.apk"
+          TAG="${{ inputs.tag_name }}"
+          DEST="Anikku1-armeabi-v7a-${TAG}.apk"
           cp "$APK" "$DEST"
-          echo "apk=$DEST" >> $GITHUB_OUTPUT
-          echo "size=$(du -sh $DEST | cut -f1)" >> $GITHUB_OUTPUT
-          echo "Found: $APK → $DEST"
+          echo "apk=$DEST" >> "$GITHUB_OUTPUT"
+          echo "size=$(du -sh "$DEST" | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "Found: $APK -> $DEST"
 
-      - name: Show R8 mapping size
+      - name: Collect R8 and Compose reports
+        if: always()
         run: |
-          find . -name "mapping.txt" 2>/dev/null | head -3 | xargs ls -lh 2>/dev/null || echo "No mapping.txt found"
+          set -euo pipefail
+          mkdir -p r8-report
+          if [ -d app/build/outputs/mapping ]; then
+            cp -R app/build/outputs/mapping/. r8-report/
+          fi
+          if [ -d build/compose-reports ]; then
+            cp -R build/compose-reports/. r8-report/compose-reports/
+          fi
+          {
+            echo "R8 full mode: enabled"
+            echo "Variant: preview"
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo "Generated report files:"
+            find r8-report -type f -print | sort
+          } > r8-report/README.txt
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Anikku1-armeabi-v7a-${{ inputs.tag_name }}
+          path: ${{ steps.apk.outputs.apk }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload R8 report artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Anikku1-r8-report-${{ inputs.tag_name }}
+          path: r8-report
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Create release and upload APK
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${{ github.event.inputs.tag_name }}"
+          set -euo pipefail
+          TAG="${{ inputs.tag_name }}"
           APK="${{ steps.apk.outputs.apk }}"
-          if gh release view "\( TAG" --repo " \){{ github.repository }}" >/dev/null 2>&1; then
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" \
               --repo "${{ github.repository }}" \
               --clobber
           else
             gh release create "$TAG" "$APK" \
               --repo "${{ github.repository }}" \
-              --title "Ankku1 – $TAG (armeabi-v7a, R8, debug-signed)" \
-              --notes "Anikku armeabi-v7a build" \
+              --title "Anikku $TAG (armeabi-v7a, R8 full mode, debug-signed)" \
+              --notes "Anikku armeabi-v7a preview build with full-mode R8 and debug signing." \
               --prerelease
           fi

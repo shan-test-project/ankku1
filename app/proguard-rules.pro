@@ -304,3 +304,30 @@
 -dontwarn org.ietf.jgss.GSSManager
 -dontwarn org.ietf.jgss.GSSName
 -dontwarn org.ietf.jgss.Oid
+# Anikku v7a R8 feature compatibility
+# Keep members for UI flows, screen models, and reflection-facing APIs that must
+# remain available when full-mode R8 and resource shrinking are enabled.
+-keepattributes *Annotation*,AnnotationDefault,InnerClasses,EnclosingMethod,Signature
+
+# Anime editing, custom covers, suggestions, recommendations, and trackers.
+-keep,allowoptimization class eu.kanade.tachiyomi.ui.anime.** { *; }
+-keep,allowoptimization class eu.kanade.presentation.anime.** { *; }
+-keep,allowoptimization class eu.kanade.tachiyomi.data.track.** { *; }
+
+# Feed/browse screens and their screen models.
+-keep,allowoptimization class eu.kanade.presentation.browse.** { *; }
+-keep,allowoptimization class eu.kanade.tachiyomi.ui.browse.** { *; }
+
+# Shared Anikku/SY data and domain features, including merge, notes, and migrate.
+-keep,allowoptimization class eu.kanade.tachiyomi.data.** { *; }
+-keep,allowoptimization class eu.kanade.domain.** { *; }
+
+# Preserve serialization/DI members used by the retained feature packages.
+-keepclassmembers,allowoptimization class eu.kanade.tachiyomi.** {
+    *** Companion;
+    *** INSTANCE;
+}
+-keepclassmembers,allowoptimization class eu.kanade.domain.** {
+    *** Companion;
+    *** INSTANCE;
+}

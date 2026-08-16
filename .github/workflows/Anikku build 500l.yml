@@ -31,9 +31,13 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v3
 
+      - name: Run Spotless
+        run: ./gradlew spotlessApply --no-daemon
+
       - name: Write debug keystore
         run: |
           mkdir -p "$HOME/.android"
+          rm -f "$HOME/.android/debug.keystore"
           keytool -genkeypair \
             -keystore "$HOME/.android/debug.keystore" \
             -storepass android \
@@ -48,6 +52,7 @@ jobs:
         env:
           CI: true
         run: |
+          set -euo pipefail
           ./gradlew assemblePreview \
             -Pandroid.enableR8.fullMode=false \
             -Pandroid.testCoverageEnabled=false \
@@ -79,11 +84,11 @@ jobs:
 
       - name: Create release and upload APK
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.event.inputs.tag_name }}"
           APK="${{ steps.apk.outputs.apk }}"
-          if ! gh release view "\( TAG" --repo " \){{ github.repository }}" >/dev/null 2>&1; then
+          if ! gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --repo "${{ github.repository }}" \
               --title "Ankku1 – $TAG (armeabi-v7a, R8, debug-signed)" \

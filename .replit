@@ -1,0 +1,46 @@
+# Anikku investigation log
+# Updated: 2026-08-16 (Asia/Dhaka)
+#
+# Baseline comparison:
+# - Fork: shan-test-project/ankku1 @ 838227603324a7c5f95d39d6c545e12527cb158b
+# - Original Anikku: komikku-app/anikku @ 7ebdc04d97ea40bc5aec4c27d23caaa14870c247
+# - The two repositories have the same anime edit/tracker/feed-domain foundations at
+#   these heads. Current Anikku master does not contain executable Recommendation or
+#   Feed UI implementations.
+#
+# Confirmed implementation sources:
+# - Fill-from-tracker: TachiyomiSY/Komikku EditMangaDialog.kt and
+#   edit_manga_dialog.xml (autofill_from_tracker plus tracker selection/lookup handler).
+# - Recommendations: TachiyomiSY/Komikku exh/recs/** and the manga detail
+#   presentation/navigation wiring.
+# - Feed: TachiyomiSY/Komikku ui/browse/feed/**, presentation/browse/FeedScreen.kt,
+#   and the browse tab wiring. Anikku only retained the feed saved-search data/domain
+#   layer and translated strings.
+#
+# Root cause:
+# - These features were only partially ported from the SY/manga codebase to Anikku's
+#   anime codebase. Resource strings and R8 keep rules survived, but no executable UI
+#   classes/handlers existed for R8 to retain. R8 is not the cause of the absence.
+# - AniList and the other anime tracker login classes are present in source, including
+#   TrackLoginActivity's anilist-auth deep link. Keep this flow while porting UI.
+#
+# Applied safe fixes:
+# - Edit Anime Info now exposes autofill_from_tracker and uses linked tracker entries,
+#   remote-ID matching, and tracker search metadata to fill title, cover URL, and
+#   description. Multiple linked trackers get a selection dialog.
+# - Both APK workflows run spotlessApply before assemblePreview; the legacy workflow's
+#   malformed gh release command and keystore handling were corrected.
+# - Local commit: af018cbeb0ca0ebb65ee35044f4bbebd81359764
+# - Commit time: 2026-08-16T08:43:04+00:00
+#
+# Remaining required port (not hidden by R8): adapt the SY recommendation package and
+# Feed screens from manga models to Anikku anime models, then wire their navigation and
+# verify AniList OAuth/custom-cover persistence on-device. Do not add keep rules for
+# these until executable classes exist.
+#
+# Verification:
+# - git diff --check passed.
+# - Local Gradle/Spotless execution was blocked because this environment has no JDK;
+#   GitHub Actions provides JDK 17 and runs Spotless before the APK build.
+# - The next build must verify the autofill flow, recommendation navigation/data,
+#   Feed tab visibility/data, custom cover/edit persistence, and AniList OAuth end-to-end.

@@ -28,17 +28,28 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.track.EnhancedTracker
+import eu.kanade.tachiyomi.data.track.Tracker
+import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.databinding.EditAnimeDialogBinding
 import eu.kanade.tachiyomi.source.model.SAnime
 import eu.kanade.tachiyomi.util.lang.chop
 import eu.kanade.tachiyomi.util.system.dpToPx
+import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.widget.materialdialogs.setTextInput
 import exh.ui.metadata.adapters.MetadataUIUtil.getResourceColor
 import exh.util.dropBlank
 import exh.util.trimOrNull
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.anime.model.Anime
+import tachiyomi.domain.track.interactor.GetTracks
+import tachiyomi.domain.track.model.Track
 import tachiyomi.source.local.isLocal
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 @Composable
 @Suppress("MagicNumber", "LongMethod")
@@ -59,6 +70,8 @@ fun EditAnimeDialog(
     var binding by remember {
         mutableStateOf<EditAnimeDialogBinding?>(null)
     }
+    val getTracks = remember { Injekt.get<GetTracks>() }
+    val trackerManager = remember { Injekt.get<TrackerManager>() }
     AlertDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = {
@@ -106,7 +119,7 @@ fun EditAnimeDialog(
                         EditAnimeDialogBinding.inflate(LayoutInflater.from(factoryContext))
                             .also { binding = it }
                             .apply {
-                                onViewCreated(anime, factoryContext, this, scope)
+                                onViewCreated(anime, factoryContext, this, scope, getTracks, trackerManager)
                             }
                             .root
                     },
@@ -123,6 +136,8 @@ private fun onViewCreated(
     context: Context,
     binding: EditAnimeDialogBinding,
     scope: CoroutineScope,
+    getTracks: GetTracks,
+    trackerManager: TrackerManager,
 ) {
     loadCover(anime, binding)
 
@@ -196,6 +211,78 @@ private fun onViewCreated(
     // SY -->
     binding.resetInfo.setOnClickListener { resetInfo(anime, binding, scope) }
     // SY <--
+    binding.autofillFromTracker.setOnClickListener {
+        scope.launch {
+            fillFromTracker(anime, context, binding, scope, getTracks, trackerManager)
+        }
+    }
+}
+
+private suspend fun fillFromTracker(
+    anime: Anime,
+    context: Context,
+    binding: EditAnimeDialogBinding,
+    scope: CoroutineScope,
+    getTracks: GetTracks,
+    trackerManager: TrackerManager,
+) {
+    val trackedEntries = getTracks.await(anime.id).mapNotNull { track ->
+        val tracker = trackerManager.get(track.trackerId)
+            ?.takeUnless { it is EnhancedTracker }
+            ?: return@mapNotNull null
+        track to tracker
+    }
+
+    if (trackedEntries.isEmpty()) {
+        context.toast("No linked tracker entry found")
+        return
+    }
+
+    if (trackedEntries.size == 1) {
+        autofillFromTracker(context, binding, trackedEntries.single().first, trackedEntries.single().second)
+        return
+    }
+
+    MaterialAlertDialogBuilder(context)
+        .setTitle("Select a tracker")
+        .setItems(trackedEntries.map { it.second.name }.toTypedArray()) { _, index ->
+            val (track, tracker) = trackedEntries[index]
+            scope.launch {
+                autofillFromTracker(context, binding, track, tracker)
+            }
+        }
+        .setNegativeButton(android.R.string.cancel, null)
+        .show()
+}
+
+private suspend fun autofillFromTracker(
+    context: Context,
+    binding: EditAnimeDialogBinding,
+    track: Track,
+    tracker: Tracker,
+) {
+    try {
+        val results = tracker.animeService.searchAnime(track.title)
+        val result = results
+            .firstOrNull { it.remote_id == track.remoteId }
+            ?: results.firstOrNull()
+
+        if (result == null) {
+            context.toast("No metadata found for ${tracker.name}")
+            return
+        }
+
+        setTextIfNotBlank(binding.title::setText, result.title)
+        setTextIfNotBlank(binding.thumbnailUrl::setText, result.cover_url)
+        setTextIfNotBlank(binding.mangaDescription::setText, result.summary)
+    } catch (e: Exception) {
+        logcat(LogPriority.ERROR, e) { "Failed to fill anime metadata from ${tracker.name}" }
+        context.toast(e.message)
+    }
+}
+
+private fun setTextIfNotBlank(setter: (String) -> Unit, value: String?) {
+    value?.takeIf { it.isNotBlank() }?.let(setter)
 }
 
 private fun resetTags(anime: Anime, binding: EditAnimeDialogBinding, scope: CoroutineScope) {

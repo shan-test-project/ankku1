@@ -276,7 +276,7 @@ private suspend fun autofillFromTracker(
         setTextIfNotBlank(binding.thumbnailUrl::setText, result.cover_url)
         setTextIfNotBlank(binding.mangaDescription::setText, result.summary)
     } catch (e: Exception) {
-        logcat(LogPriority.ERROR, e) { "Failed to fill anime metadata from ${tracker.name}" }
+        e.logcat(LogPriority.ERROR) { "Failed to fill anime metadata from ${tracker.name}" }
         context.toast(e.message)
     }
 }

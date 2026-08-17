@@ -22,10 +22,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
-import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.domain.anime.model.toSAnime
+import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceScreen
 import tachiyomi.domain.anime.interactor.GetAnimeWithEpisodes
@@ -47,7 +48,7 @@ data class RecommendationsScreen(private val animeId: Long) : Screen() {
         val trackerManager = remember { Injekt.get<TrackerManager>() }
         var anime by remember { mutableStateOf<tachiyomi.domain.anime.model.Anime?>(null) }
         var sourceSuggestions by remember {
-            mutableStateOf < List<Pair<String, List<eu.kanade.tachiyomi.animesource.model.SAnime>>>(emptyList())
+            mutableStateOf<List<Pair<String, List<SAnime>>>>(emptyList())
         }
         var tracks by remember { mutableStateOf<List<Track>>(emptyList()) }
 

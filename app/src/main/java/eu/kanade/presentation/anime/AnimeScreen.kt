@@ -136,6 +136,7 @@ fun AnimeScreen(
     changeAnimeSkipIntro: (() -> Unit)?,
     // SY -->
     onEditInfoClicked: () -> Unit,
+    onRecommendationsClicked: () -> Unit,
     // SY <--
 
     // For bottom action menu
@@ -201,6 +202,7 @@ fun AnimeScreen(
             changeAnimeSkipIntro = changeAnimeSkipIntro,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
+            onRecommendationsClicked = onRecommendationsClicked,
             // SY <--
             onMultiBookmarkClicked = onMultiBookmarkClicked,
             // AM (FILLERMARK) -->
@@ -249,6 +251,7 @@ fun AnimeScreen(
             onMigrateClicked = onMigrateClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
+            onRecommendationsClicked = onRecommendationsClicked,
             // SY <--
             onMultiBookmarkClicked = onMultiBookmarkClicked,
             // AM (FILLERMARK) -->
@@ -309,6 +312,7 @@ private fun AnimeScreenSmallImpl(
     onSettingsClicked: (() -> Unit)?,
     // SY -->
     onEditInfoClicked: () -> Unit,
+    onRecommendationsClicked: () -> Unit,
     // SY <--
 
     // For bottom action menu
@@ -381,6 +385,7 @@ private fun AnimeScreenSmallImpl(
                 onClickMigrate = onMigrateClicked,
                 // SY -->
                 onClickEditInfo = onEditInfoClicked.takeIf { state.anime.favorite },
+                onClickRecommendations = onRecommendationsClicked,
                 // SY <--
                 onClickSettings = onSettingsClicked,
                 changeAnimeSkipIntro = changeAnimeSkipIntro,
@@ -617,6 +622,7 @@ fun AnimeScreenLargeImpl(
     onSettingsClicked: (() -> Unit)?,
     // SY -->
     onEditInfoClicked: () -> Unit,
+    onRecommendationsClicked: () -> Unit,
     // SY <--
 
     // For bottom action menu
@@ -684,6 +690,7 @@ fun AnimeScreenLargeImpl(
                 changeAnimeSkipIntro = changeAnimeSkipIntro,
                 // SY -->
                 onClickEditInfo = onEditInfoClicked.takeIf { state.anime.favorite },
+                onClickRecommendations = onRecommendationsClicked,
                 // SY <--
                 actionModeCounter = selectedEpisodeCount,
                 onSelectAll = { onAllEpisodeSelected(true) },

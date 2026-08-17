@@ -1,4 +1,4 @@
-name: Build Anikku armeabi-v7a APK
+name: Build Anikku arm64-v8a APK
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       tag_name:
         description: 'Release tag name'
         required: false
-        default: 'v7a-latest'
+        default: 'arm64-latest'
         type: string
 
 permissions:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build:
-    name: Build armeabi-v7a APK (R8 + debug-signed)
+    name: Build arm64-v8a APK (R8 + debug-signed)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -52,7 +52,7 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US" \
             -noprompt
 
-      - name: Build preview APK (armeabi-v7a, full-mode R8, debug-signed)
+      - name: Build preview APK (arm64-v8a, full-mode R8, debug-signed)
         env:
           CI: true
         run: |
@@ -73,18 +73,18 @@ jobs:
             -Pandroid.injected.signing.key.alias=androiddebugkey \
             -Pandroid.injected.signing.key.password=android
 
-      - name: Find and rename armeabi-v7a APK
+      - name: Find and rename arm64-v8a APK
         id: apk
         run: |
           set -euo pipefail
-          APK="$(find app/build/outputs/apk -type f -name '*.apk' -print | grep -Ei 'armeabi-v7a|armeabi_v7a' | head -1 || true)"
+          APK="$(find app/build/outputs/apk -type f -name '*.apk' -print | grep -Ei 'arm64-v8a|arm64_v8a' | head -1 || true)"
           if [ -z "$APK" ]; then
-            echo 'No armeabi-v7a APK was produced. Available APKs:'
+            echo 'No arm64-v8a APK was produced. Available APKs:'
             find app/build/outputs/apk -type f -name '*.apk' -print || true
             exit 1
           fi
           TAG="${{ inputs.tag_name }}"
-          DEST="Anikku1-armeabi-v7a-${TAG}.apk"
+          DEST="Anikku1-arm64-v8a-${TAG}.apk"
           cp "$APK" "$DEST"
           echo "apk=$DEST" >> "$GITHUB_OUTPUT"
           echo "size=$(du -sh "$DEST" | cut -f1)" >> "$GITHUB_OUTPUT"
@@ -113,7 +113,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: Anikku1-armeabi-v7a-${{ inputs.tag_name }}
+          name: Anikku1-arm64-v8a-${{ inputs.tag_name }}
           path: ${{ steps.apk.outputs.apk }}
           if-no-files-found: error
           retention-days: 7

@@ -48,6 +48,7 @@ fun AnimeToolbar(
     onClickSettings: (() -> Unit)?,
     // SY -->
     onClickEditInfo: (() -> Unit)?,
+    onClickRecommendations: (() -> Unit)?,
     // SY <--
     // Anime only
     changeAnimeSkipIntro: (() -> Unit)?,
@@ -130,6 +131,14 @@ fun AnimeToolbar(
                                         AppBar.OverflowAction(
                                             title = stringResource(SYMR.strings.action_edit_info),
                                             onClick = onClickEditInfo,
+                                        ),
+                                    )
+                                }
+                                if (onClickRecommendations != null) {
+                                    add(
+                                        AppBar.OverflowAction(
+                                            title = "See Recommendations",
+                                            onClick = onClickRecommendations,
                                         ),
                                     )
                                 }

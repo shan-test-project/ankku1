@@ -78,6 +78,8 @@ android {
 
             applicationIdSuffix = ".beta"
 
+            isMinifyEnabled = true
+            isShrinkResources = true
             versionNameSuffix = debug.versionNameSuffix
             signingConfig = debug.signingConfig
 
